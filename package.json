@@ -2,7 +2,7 @@
   "name": "metrics-store",
   "version": "0.0.1",
   "dependencies": {
-    
+    "restify": "2.3.4"
   },
   "engines": {
     "node": "0.8.x",
