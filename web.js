@@ -3,6 +3,9 @@ var port = process.env.PORT || 8888;
 var mongoUri = process.env.MONGOLAB_URI || 
   process.env.MONGOHQ_URL || 
   'mongodb://localhost/metrics-store'; 
+
+var username = process.env.METRICS_USERNAME || 'user';
+var password = process.env.METRICS_PASSWORD || 'pwd';
   
 var restify = require('restify');
 var mongoose = require('mongoose');
@@ -71,8 +74,25 @@ var server = restify.createServer({
   version: '0.0.1'
 });
 
+function authenticate(req, res, next) {
+    var authz = req.authorization;
+    console.log('%j', authz)
+    if (authz.scheme !== 'Basic' ||
+        authz.basic.username !== username ||
+        authz.basic.password !== password) {
+        return next(new restify.NotAuthorizedError('failed to authenticate'));
+    }
+ 
+    return next();
+}
+
 server.use(restify.acceptParser(server.acceptable));
+server.use(restify.CORS());
+server.use(restify.authorizationParser());
+server.use(authenticate);
 server.use(restify.queryParser());
+server.use(restify.jsonp());
+server.use(restify.gzipResponse());
 server.use(restify.bodyParser());
 
 // prep end points
