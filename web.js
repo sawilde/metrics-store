@@ -17,18 +17,67 @@ mongoose.connect(mongoUri, mongoOptions, function (err, res) {
   }
 });
 
+var metricSchema = new mongoose.Schema({
+  name: { type: String, trim: true },
+  value: { type: Number },
+  date: { type: Date }
+});
+
+// hide fields from json
+metricSchema.methods.toJSON = function() {
+  obj = this.toObject();
+  delete obj._id;
+  delete obj.__v;
+  return obj;
+};
+
+// register schema
+var Metric = mongoose.model('Metrics', metricSchema);
+/*
+Metric.remove({}, function(err) {
+  if (err) {
+    console.log ('error deleting old data.');
+  }
+});
+
+var test = new Metric ({
+  name: 'OpenCover_Coverage',
+  value: 94.57,
+  date: new Date
+});
+
+test.save (function (err) { if (err) console.log ('Error on save!') });
+*/
+
+function postMetric(req, res, next) {
+  var metric = new Metric ({
+    name: req.params['name'],
+    value: req.params['value'],
+    date: req.params['date'] || new Date
+  });
+  metric.save(function () {
+    res.send(req.body);
+  });
+}
+
+function getMetrics(req, res, next) {
+  Metric.find().sort('-date').execFind(function (arr,data) {
+    res.send(data);
+  });
+}
+// initialise server
 var server = restify.createServer({
   name: 'metrics-store',
   version: '0.0.1'
 });
+
 server.use(restify.acceptParser(server.acceptable));
 server.use(restify.queryParser());
 server.use(restify.bodyParser());
 
-server.get('/echo/:name', function (req, res, next) {
-  res.send(req.params);
-  return next();
-});
+// prep end points
+server.post('/metrics', postMetric);
+server.get('/metrics', getMetrics);
 
 server.listen(port, function () {
   console.log('%s listening at %s', server.name, server.url);
