@@ -68,6 +68,14 @@ function getMetrics(req, res, next) {
     res.send(data);
   });
 }
+
+function deleteMetrics(req, res, next) {
+  Metric.remove(function() {
+    res.send(204);
+    return next();
+  });
+}
+
 // initialise server
 var server = restify.createServer({
   name: 'metrics-store',
@@ -75,14 +83,13 @@ var server = restify.createServer({
 });
 
 function authenticate(req, res, next) {
+    if (req.method === 'GET') return next();
     var authz = req.authorization;
-    console.log('%j', authz)
     if (authz.scheme !== 'Basic' ||
         authz.basic.username !== username ||
         authz.basic.password !== password) {
         return next(new restify.NotAuthorizedError('failed to authenticate'));
     }
- 
     return next();
 }
 
@@ -98,6 +105,7 @@ server.use(restify.bodyParser());
 // prep end points
 server.post('/metrics', postMetric);
 server.get('/metrics', getMetrics);
+server.del('/metrics', deleteMetrics);
 
 server.listen(port, function () {
   console.log('%s listening at %s', server.name, server.url);
