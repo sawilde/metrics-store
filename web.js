@@ -1,4 +1,4 @@
-// common settings - use heroku environment variables then fallback to local dev settings
+// common settings - use environment variables then fallback to default settings
 var port = process.env.PORT || 8888;
 var mongoUri = process.env.MONGOLAB_URI || 
   process.env.MONGOHQ_URL || 
@@ -8,7 +8,7 @@ var username = process.env.METRICS_USERNAME || 'user';
 var password = process.env.METRICS_PASSWORD || 'pwd';
   
 var restify = require('restify');
-var mongoose = require('mongoose');
+var mongoose = require('mongoose'), Schema = mongoose.Schema;
  
 // prep the mongo database connection
 var mongoOptions = { db: { safe: true }};
@@ -20,7 +20,9 @@ mongoose.connect(mongoUri, mongoOptions, function (err, res) {
   }
 });
 
-var valueSchema = new mongoose.Schema({
+// build the schemas
+var valueSchema = new Schema({
+  metric: { type: Schema.Types.ObjectId, ref: 'Metric', index:true},
   value: { type: Number },
   date: { type: Date }
 });
@@ -28,12 +30,19 @@ var valueSchema = new mongoose.Schema({
 valueSchema.methods.toJSON = function() {
   obj = this.toObject();
   delete obj._id;
+  delete obj.__v;
+  delete obj.metric;
   return obj;
 };
 
-var metricSchema = new mongoose.Schema({
+var metricSchema = new Schema({
   name: { type: String, trim: true },
-  values: [ valueSchema ]
+  values: [{ type: Schema.Types.ObjectId, ref: 'Value' }] 
+});
+
+metricSchema.pre('remove', function(next) {
+    Value.remove({metric: this._id}).exec();
+    next();
 });
 
 metricSchema.methods.toJSON = function() {
@@ -42,60 +51,69 @@ metricSchema.methods.toJSON = function() {
   delete obj.__v;
   for (var i=0, value; value = obj.values[i]; i++) {
     delete value._id;
+    delete value.__v;
+    delete value.metric;
   }
   return obj;
 };
-
+ 
 // register schema
-var Metric = mongoose.model('Metrics', metricSchema);
+var Value = mongoose.model('Value', valueSchema);
+var Metric = mongoose.model('Metric', metricSchema);
 
+// API handlers
 function postMetricValue(req, res, next) {
   Metric.findOne({ 'name': req.params['name'] }, function (err, metric) {
-    
-	if (!metric){
-	  metric = new Metric ({
-        name: req.params['name']
-      })
-      metric.save();	
-	} 
-	
-	var value = metric.values.create({
-	  value: req.params['value'],
-      date: req.params['date'] || new Date
-	});
-	metric.values.push(value);
 
-	metric.save(function () {
-	  res.send(201, value);
-	});
+    metric = metric || new Metric ({
+          name: req.params['name']
+        });
+    
+    var value = new Value({
+      value: req.params['value'],
+        date: req.params['date'] || new Date
+    });
+    
+    value.save(function(){
+      metric.values.push(value);
+      metric.save(function () {
+        res.send(201, value);
+      });
+    });	
   });
 }
 
 function getMetric(req, res, next) {
-  Metric.findOne({ 'name': req.params['name'] }, function (err, metric) {
+  var when = new Date;
+  when.setDate(when.getDate()-21);
+  Metric.findOne({ 'name': req.params['name'] }).populate('values', null, { date: { $gte: when }}).exec(function (err, metric) {
     if (!metric) {
-	  res.send(404);
+      res.send(404);
       return next();
-	}
+    }
     res.send(metric);
   });
 }
 
 function deleteMetrics(req, res, next) {
   Metric.remove(function() {
-    res.send(204);
-    return next();
+    Value.remove(function() {
+      res.send(204);
+      return next();
+    });
   });
 }
 
 function deleteMetric(req, res, next) {
-  Metric.find({ 'name': req.params['name'] }).remove(function() {
-    res.send(204);
-    return next();
+  Metric.findOne({ 'name': req.params['name'] }, function(err, metric){
+    metric.remove(function() { // we need to use this method so that the pre-hook will work
+      res.send(204);
+      return next();
+    });
   });
 }
 
-// initialise server
+// initialise restify server
 var server = restify.createServer({
   name: 'metrics-store',
   version: '0.0.1'
@@ -105,9 +123,9 @@ function authenticate(req, res, next) {
     if (req.method === 'GET') return next();
     var authz = req.authorization;
     if (authz.scheme !== 'Basic' ||
-        authz.basic.username !== username ||
-        authz.basic.password !== password) {
-        return next(new restify.NotAuthorizedError('failed to authenticate'));
+      authz.basic.username !== username ||
+      authz.basic.password !== password) {
+      return next(new restify.NotAuthorizedError('failed to authenticate'));
     }
     return next();
 }
@@ -121,7 +139,7 @@ server.use(restify.jsonp());
 server.use(restify.gzipResponse());
 server.use(restify.bodyParser());
 
-// prep end points
+// expose end points
 server.post('/metrics/:name/value', postMetricValue);
 server.get('/metrics/:name', getMetric);
 server.del('/metrics', deleteMetrics);
