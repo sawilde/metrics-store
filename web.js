@@ -20,57 +20,76 @@ mongoose.connect(mongoUri, mongoOptions, function (err, res) {
   }
 });
 
-var metricSchema = new mongoose.Schema({
-  name: { type: String, trim: true },
+var valueSchema = new mongoose.Schema({
   value: { type: Number },
   date: { type: Date }
 });
 
-// hide fields from json
+valueSchema.methods.toJSON = function() {
+  obj = this.toObject();
+  delete obj._id;
+  return obj;
+};
+
+var metricSchema = new mongoose.Schema({
+  name: { type: String, trim: true },
+  values: [ valueSchema ]
+});
+
 metricSchema.methods.toJSON = function() {
   obj = this.toObject();
   delete obj._id;
   delete obj.__v;
+  for (var i=0, value; value = obj.values[i]; i++) {
+    delete value._id;
+  }
   return obj;
 };
 
 // register schema
 var Metric = mongoose.model('Metrics', metricSchema);
-/*
-Metric.remove({}, function(err) {
-  if (err) {
-    console.log ('error deleting old data.');
-  }
-});
 
-var test = new Metric ({
-  name: 'OpenCover_Coverage',
-  value: 94.57,
-  date: new Date
-});
+function postMetricValue(req, res, next) {
+  Metric.findOne({ 'name': req.params['name'] }, function (err, metric) {
+    
+	if (!metric){
+	  metric = new Metric ({
+        name: req.params['name']
+      })
+      metric.save();	
+	} 
+	
+	var value = metric.values.create({
+	  value: req.params['value'],
+      date: req.params['date'] || new Date
+	});
+	metric.values.push(value);
 
-test.save (function (err) { if (err) console.log ('Error on save!') });
-*/
-
-function postMetric(req, res, next) {
-  var metric = new Metric ({
-    name: req.params['name'],
-    value: req.params['value'],
-    date: req.params['date'] || new Date
-  });
-  metric.save(function () {
-    res.send(req.body);
+	metric.save(function () {
+	  res.send(201, value);
+	});
   });
 }
 
-function getMetrics(req, res, next) {
-  Metric.find().sort('-date').execFind(function (arr,data) {
-    res.send(data);
+function getMetric(req, res, next) {
+  Metric.findOne({ 'name': req.params['name'] }, function (err, metric) {
+    if (!metric) {
+	  res.send(404);
+      return next();
+	}
+    res.send(metric);
   });
 }
 
 function deleteMetrics(req, res, next) {
   Metric.remove(function() {
+    res.send(204);
+    return next();
+  });
+}
+
+function deleteMetric(req, res, next) {
+  Metric.find({ 'name': req.params['name'] }).remove(function() {
     res.send(204);
     return next();
   });
@@ -103,9 +122,10 @@ server.use(restify.gzipResponse());
 server.use(restify.bodyParser());
 
 // prep end points
-server.post('/metrics', postMetric);
-server.get('/metrics', getMetrics);
+server.post('/metrics/:name/value', postMetricValue);
+server.get('/metrics/:name', getMetric);
 server.del('/metrics', deleteMetrics);
+server.del('/metrics/:name', deleteMetric);
 
 server.listen(port, function () {
   console.log('%s listening at %s', server.name, server.url);
