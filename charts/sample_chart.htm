@@ -18,18 +18,34 @@
       data.addColumn('date', 'Date');
       data.addColumn('number', 'Sequence Coverage');
       data.addColumn('number', 'Branch Coverage');
-	  	  
+	  
+	  var dates = [];
+	  
 	  for (var i=0; i < seqvalues.length; i++) {
-	    data.addRow([new Date(seqvalues[i].date), seqvalues[i].value, null]);
+	    var date = new Date(seqvalues[i].date);
+		dates.push(date);
+	    data.addRow([date, seqvalues[i].value, null]);
 	  }
 	  for (var i=0; i < brvalues.length; i++) {
-	    data.addRow([new Date(brvalues[i].date), null, brvalues[i].value]);
+	    var date = new Date(brvalues[i].date);
+		dates.push(date);
+	    data.addRow([date, null, brvalues[i].value]);
 	  }
 	  
+	  var min = new Date(Math.min.apply(null, dates));
+	  var max = new Date(Math.max.apply(null, dates));
+	  
+	  min.setDate(min.getDate()-1);
+	  max.setDate(max.getDate()+1);
+	  	  
 	  visualization = new google.visualization.LineChart(document.getElementById('visualization'));
       visualization.draw(data, {curveType: "function",
+	                    pointSize: 5,
                         width: 500, height: 400,
-                        vAxis: {maxValue: 100, minValue: 0}});
+                        vAxis: {maxValue: 100, minValue: 0},
+						hAxis: {viewWindowMode: 'explicit',
+							viewWindow: {min: min,
+										 max: max} }});
 	}	
 	
 	function getDataAndVisualize(){
