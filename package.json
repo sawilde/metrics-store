@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "dependencies": {
     "restify": "2.3.4",
-    "mongoose": "3.5.7"
+    "mongoose": "3.5.7",
+    "connect": "2.7.3"
   },
   "engines": {
     "node": "0.8.x",

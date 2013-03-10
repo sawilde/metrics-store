@@ -28,9 +28,10 @@
 	}	
 	
 	function getDataAndVisualize(){
-      $.getJSON('http://localhost:8888/metrics/wibble?callback=?', function(data) {
+        $.getJSON('/metrics/opencover_release?callback=?', function(data) {
 		  drawVisualization(data.values);
-		});
+		})
+		.error(function(err) { drawVisualization([]); }); // probably 404
 	}
 	
 	$( document ).ready( function() {

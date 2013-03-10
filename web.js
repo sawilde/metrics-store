@@ -6,9 +6,11 @@ var mongoUri = process.env.MONGOLAB_URI ||
 
 var username = process.env.METRICS_USERNAME || 'user';
 var password = process.env.METRICS_PASSWORD || 'pwd';
-  
+
+// bring in the requires  
 var restify = require('restify');
 var mongoose = require('mongoose'), Schema = mongoose.Schema;
+var connect = require('connect');
  
 // prep the mongo database connection
 var mongoOptions = { db: { safe: true }};
@@ -139,11 +141,19 @@ server.use(restify.jsonp());
 server.use(restify.gzipResponse());
 server.use(restify.bodyParser());
 
+// hook in static pages
+var static_docs_server = connect.static(__dirname + '/charts');
+server.get(/\/charts\/*/, function(req, res, next) {
+  req.url = req.url.substr('/charts'.length);
+  return static_docs_server(req, res, next);
+});
+
 // expose end points
 server.post('/metrics/:name/value', postMetricValue);
 server.get('/metrics/:name', getMetric);
 server.del('/metrics', deleteMetrics);
 server.del('/metrics/:name', deleteMetric);
+
 
 server.listen(port, function () {
   console.log('%s listening at %s', server.name, server.url);
