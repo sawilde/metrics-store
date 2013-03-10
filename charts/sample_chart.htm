@@ -41,8 +41,9 @@
 	  visualization = new google.visualization.LineChart(document.getElementById('visualization'));
       visualization.draw(data, {curveType: "function",
 	                    pointSize: 5,
+						title: 'OpenCover Coverage Results',
                         width: 500, height: 400,
-                        vAxis: {maxValue: 100, minValue: 0},
+                        vAxis: {maxValue: 100, minValue: 0, title: 'Percentage'},
 						hAxis: {viewWindowMode: 'explicit',
 							viewWindow: {min: min,
 										 max: max} }});

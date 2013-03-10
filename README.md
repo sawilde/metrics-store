@@ -14,3 +14,7 @@ e.g. for Heroku
 heroku config:add METRICS_USERNAME=user --app <APPNAME>
 heroku config:add METRICS_PASSWORD=pwd --app <APPNAME>
 ```
+
+#### CHART
+
+The Sample Chart is available showing the current [OpenCover coverage](http://opencover-metrics.herokuapp.com/charts/sample_chart.htm) metrics.
