@@ -12,15 +12,20 @@
     </script>
 	<script>
 
-    function drawVisualization(values){
-	  
+    function drawVisualization(seqvalues, brvalues){
+		  
 	  var data = new google.visualization.DataTable();
       data.addColumn('date', 'Date');
-      data.addColumn('number', 'Coverage');
-	  
-	  for (var i=0; i < values.length; i++) {
-	    data.addRow([new Date(values[i].date), values[i].value]);
+      data.addColumn('number', 'Sequence Coverage');
+      data.addColumn('number', 'Branch Coverage');
+	  	  
+	  for (var i=0; i < seqvalues.length; i++) {
+	    data.addRow([new Date(seqvalues[i].date), seqvalues[i].value, null]);
 	  }
+	  for (var i=0; i < brvalues.length; i++) {
+	    data.addRow([new Date(brvalues[i].date), null, brvalues[i].value]);
+	  }
+	  
 	  visualization = new google.visualization.LineChart(document.getElementById('visualization'));
       visualization.draw(data, {curveType: "function",
                         width: 500, height: 400,
@@ -28,10 +33,25 @@
 	}	
 	
 	function getDataAndVisualize(){
-        $.getJSON('/metrics/opencover_release?callback=?', function(data) {
-		  drawVisualization(data.values);
-		})
-		.error(function(err) { drawVisualization([]); }); // probably 404
+	    var jxhr = [];
+		var seqvalues = [];
+		var brvalues = [];
+	
+        jxhr.push(
+		  $.getJSON('/metrics/opencover_release_sequence?callback=?', function(data) {
+		    seqvalues = data.values;
+		  }) 
+		); 
+		
+        jxhr.push(
+		  $.getJSON('/metrics/opencover_release_branch?callback=?', function(data) {
+		    brvalues = data.values;
+		  }) 
+		); 
+		
+		$.when.apply($, jxhr).done(function() {
+		  drawVisualization(seqvalues, brvalues);
+		});
 	}
 	
 	$( document ).ready( function() {
