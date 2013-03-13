@@ -6,77 +6,129 @@
       Simple Chart Sample Using Data From Metrics-Store
     </title>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-	<script type="text/javascript" src="http://www.google.com/jsapi"></script>
-	<script type="text/javascript">
+	  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+	  <script type="text/javascript">
       google.load('visualization', '1', {packages: ['corechart']});
     </script>
-	<script>
-
+	  <script>
     function drawVisualization(seqvalues, brvalues){
-		  
-	  var data = new google.visualization.DataTable();
+        
+      var data = new google.visualization.DataTable();
       data.addColumn('date', 'Date');
       data.addColumn('number', 'Sequence Coverage');
       data.addColumn('number', 'Branch Coverage');
-	  
-	  var dates = [];
-	  
-	  for (var i=0; i < seqvalues.length; i++) {
-	    var date = new Date(seqvalues[i].date);
-		dates.push(date);
-	    data.addRow([date, seqvalues[i].value, null]);
-	  }
-	  for (var i=0; i < brvalues.length; i++) {
-	    var date = new Date(brvalues[i].date);
-		dates.push(date);
-	    data.addRow([date, null, brvalues[i].value]);
-	  }
-	  
-	  var min = new Date(Math.min.apply(null, dates));
-	  var max = new Date(Math.max.apply(null, dates));
-	  
-	  min.setDate(min.getDate()-1);
-	  max.setDate(max.getDate()+1);
-	  	  
-	  visualization = new google.visualization.LineChart(document.getElementById('visualization'));
+
+      var dates = [];
+
+      for (var i=0; i < seqvalues.length; i++) {
+        var date = new Date(seqvalues[i].date);
+        dates.push(date);
+        data.addRow([date, seqvalues[i].value, null]);
+      }
+      for (var i=0; i < brvalues.length; i++) {
+        var date = new Date(brvalues[i].date);
+        dates.push(date);
+        data.addRow([date, null, brvalues[i].value]);
+      }
+
+      if (dates.length==0){
+        dates.push(new Date());
+      }	  
+
+      var min = new Date(Math.min.apply(null, dates));
+      var max = new Date(Math.max.apply(null, dates));	  
+      min.setDate(min.getDate()-1);
+      max.setDate(max.getDate()+1);
+
+      visualization = new google.visualization.LineChart(document.getElementById('visualization'));
       visualization.draw(data, {curveType: "function",
-	                    pointSize: 5,
-						title: 'OpenCover Coverage Results',
-                        width: 500, height: 400,
-                        vAxis: {maxValue: 100, minValue: 0, title: 'Percentage'},
-						hAxis: {viewWindowMode: 'explicit',
-							viewWindow: {min: min,
-										 max: max} }});
-	}	
-	
-	function getDataAndVisualize(){
-	    var jxhr = [];
-		var seqvalues = [];
-		var brvalues = [];
-	
-        jxhr.push(
-		  $.getJSON('/metrics/opencover_release_sequence?callback=?', function(data) {
-		    seqvalues = data.values;
-		  }) 
-		); 
-		
-        jxhr.push(
-		  $.getJSON('/metrics/opencover_release_branch?callback=?', function(data) {
-		    brvalues = data.values;
-		  }) 
-		); 
-		
-		$.when.apply($, jxhr).done(function() {
-		  drawVisualization(seqvalues, brvalues);
-		});
-	}
-	
-	$( document ).ready( function() {
-	  getDataAndVisualize();
+        pointSize: 5,
+        title: 'OpenCover Coverage Results',
+        width: 500, height: 400,
+        vAxis: {maxValue: 100, minValue: 0, title: 'Percentage'},
+        hAxis: {viewWindowMode: 'explicit',
+        viewWindow: {min: min,
+        max: max} }});
+    }	
+    
+    function getDataAndVisualize(){
+      var jxhr = [];
+
+      var seqvalues = [];
+      var brvalues = [];
+      
+      /*
+      // the ajax call doesn't complete/done when there are errors ie 404
+      jxhr.push(
+        $.getJSON('/metrics/opencover_release_sequence?callback=?', function(metric) {
+          seqvalues = metric.values;
+        }) 
+		  );      
+      
+      jxhr.push(
+        $.ajax({url : '/metrics/opencover_release_sequence',
+          dataType : "jsonp",
+          timeout : 5000          
+        }).done(function(metric){
+          seqvalues = metric.values;
+        })
+      );
+      */
+
+      /*
+      // this works but no way to handle timeouts
+      jxhr.push(function(){
+        return $.Deferred(function(dfd){
+          $.getJSON('/metrics/opencover_release_sequence?callback=?', function(metric) {
+            seqvalues = metric.values;
+          }).always(function(){
+            dfd.resolve();
+          });          
+        }).promise();
+      }());		
+      */
+      
+      // wrap the ajax call in a function returning a $.Deferred(...).promise()
+      // NOTE: the () at the end forces execution of the function such that we 
+      // store an array of promises rather than an array of functions
+      jxhr.push(function(){
+        return $.Deferred(function(dfd){
+          $.ajax({url : '/metrics/opencover_release_sequence',
+            dataType : "jsonp",
+            timeout : 5000          
+          }).done(function(metric){
+            seqvalues = metric.values;
+          }).always(function(){
+            dfd.resolve();
+          });          
+        }).promise();
+      }());		
+      
+      jxhr.push(function(){
+        return $.Deferred(function(dfd){
+          $.ajax({url : '/metrics/opencover_release_branch',
+            dataType : "jsonp",
+            timeout : 5000          
+          }).done(function(metric){
+            brvalues = metric.values;
+          }).always(function(){
+            dfd.resolve();
+          });          
+        }).promise();
+      }());		
+            
+      $.when.apply(null, jxhr).done(function() {
+        drawVisualization(seqvalues, brvalues);
+      });
+    }
+    
+    $( document ).ready( function() {
+      getDataAndVisualize();
     });
 
-	</script>
+    </script>
+  <head>
 	<body>
-  	  <div id="visualization"></div>
+  	<div id="visualization"></div>
 	</body>	
 </html>
