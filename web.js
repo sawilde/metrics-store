@@ -52,7 +52,6 @@ metricSchema.methods.toJSON = function() {
   delete obj._id;
   delete obj.__v;
   for (var i=0, value; value = obj.values[i]; i++) {
-    delete value._id;
     delete value.__v;
     delete value.metric;
   }
@@ -115,6 +114,16 @@ function deleteMetric(req, res, next) {
   });
 }
 
+function deleteMetricValue(req, res, next) {
+  Metric.findOne({ 'name': req.params['name'] }, function(err, metric){
+    var id = mongoose.Types.ObjectId(req.params['id']);
+    metric.values.pull({ '_id':  id});
+    metric.save(function () {
+      res.send(204);
+    });  
+  });
+}
+
 // initialise restify server
 var server = restify.createServer({
   name: 'metrics-store',
@@ -150,6 +159,7 @@ server.get(/\/charts\/*/, function(req, res, next) {
 
 // expose end points
 server.post('/metrics/:name/value', postMetricValue);
+server.del('/metrics/:name/value/:id', deleteMetricValue);
 server.get('/metrics/:name', getMetric);
 server.del('/metrics', deleteMetrics);
 server.del('/metrics/:name', deleteMetric);
